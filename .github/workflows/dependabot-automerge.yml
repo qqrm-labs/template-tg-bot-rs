@@ -13,6 +13,7 @@ permissions:
   pull-requests: write
   checks: read
   statuses: read
+  actions: read
 
 concurrency:
   group: dependabot-automerge-${{ github.event.pull_request.number }}
