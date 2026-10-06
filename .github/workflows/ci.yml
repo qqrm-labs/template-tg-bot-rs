@@ -54,10 +54,6 @@ jobs:
             cargo-machete@0.9.2
           fallback: none
 
-      # This application template intentionally has no committed Cargo.lock yet.
-      - name: Resolve dependencies for audit
-        run: cargo generate-lockfile
-
       - name: Audit dependencies
         run: cargo audit
 
