@@ -5,6 +5,8 @@ on:
   push:
     branches: [main]
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -23,40 +25,40 @@ jobs:
           persist-credentials: false
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Format
         run: cargo fmt --all -- --check
 
       - name: Check
-        run: cargo check --tests --benches
+        run: cargo check --locked --tests --benches
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@e407f7bafb71fd004bc5c2da3032e5470cbb6ef0 # v2.87.24
         with:
           tool: cargo-nextest
           fallback: none
 
       - name: Test with nextest
-        run: cargo nextest run --no-tests=pass
+        run: cargo nextest run --locked --no-tests=pass
+
+      - name: Run the placeholder without credentials
+        run: cargo run --locked
 
       - name: Install dependency tooling
-        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        uses: taiki-e/install-action@e407f7bafb71fd004bc5c2da3032e5470cbb6ef0 # v2.87.24
         with:
           tool: |
             cargo-audit@0.22.2
             cargo-deny@0.20.2
             cargo-machete@0.9.2
           fallback: none
-
-      # This application template intentionally has no committed Cargo.lock yet.
-      - name: Resolve dependencies for audit
-        run: cargo generate-lockfile
 
       - name: Audit dependencies
         run: cargo audit
@@ -66,3 +68,15 @@ jobs:
 
       - name: Check unused dependencies
         run: cargo machete
+
+  ci-gate:
+    if: always()
+    needs: [checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every CI job to succeed
+        env:
+          RESULT_0: ${{ needs.checks.result }}
+        run: |
+          test "$RESULT_0" = success

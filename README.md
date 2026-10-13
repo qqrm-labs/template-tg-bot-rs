@@ -2,6 +2,14 @@
 
 Template repository for scheduled Rust bots running on GitHub Actions.
 
+`Cargo.lock` is committed because this is an application. CI and the bot runner use
+`--locked`; CI also runs the harmless placeholder without Telegram credentials.
+
+Dependency updates form one weekly maintenance batch with a seven-day cooldown.
+Native auto-merge waits for `ci-gate` and `workflow-security-gate` on the current
+commit, with no review approval or merge cron. Derived repositories must require
+both gates, keep the branch up to date, and enable native auto-merge.
+
 ## Included
 - CI workflow with dependency checks (`.github/workflows/ci.yml`)
 - GitHub Actions security workflow with actionlint and Zizmor (`.github/workflows/workflow-security.yml`)
