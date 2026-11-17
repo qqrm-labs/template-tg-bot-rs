@@ -8,10 +8,7 @@ on: # zizmor: ignore[dangerous-triggers]
     types: [completed]
 
 # Metadata only: never check out PR code or consume its artifacts here.
-permissions:
-  contents: write
-  pull-requests: write
-  checks: read
+permissions: {}
 
 concurrency:
   group: dependabot-automerge-${{ github.event.workflow_run.head_branch }}
@@ -19,6 +16,12 @@ concurrency:
 
 jobs:
   automerge:
+    permissions:
+      # Required when enabling auto-merge for updates to workflow files.
+      actions: write
+      contents: write
+      pull-requests: write
+      checks: read
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
