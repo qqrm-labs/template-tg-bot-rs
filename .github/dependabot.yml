@@ -1,27 +1,32 @@
 version: 2
-multi-ecosystem-groups:
-  maintenance:
+# Separate groups let Dependabot refresh signed PRs reliably.
+# Multi-ecosystem refresh: https://github.com/dependabot/dependabot-core/issues/12903
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "12:00"
       timezone: "Europe/Moscow"
-
-updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    patterns: ["*"]
-    multi-ecosystem-group: "maintenance"
-    cooldown:
-      default-days: 7
-
-  - package-ecosystem: "cargo"
-    directory: "/"
-    patterns: ["*"]
-    multi-ecosystem-group: "maintenance"
     cooldown:
       default-days: 7
     groups:
+      actions-maintenance:
+        patterns: ["*"]
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "12:00"
+      timezone: "Europe/Moscow"
+    cooldown:
+      default-days: 7
+    groups:
+      cargo-maintenance:
+        patterns: ["*"]
       security:
         applies-to: "security-updates"
         patterns: ["*"]
