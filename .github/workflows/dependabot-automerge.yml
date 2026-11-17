@@ -4,7 +4,7 @@ name: Dependabot Automerge
 # The native gates and --match-head-commit bind the write to the checked commit.
 on: # zizmor: ignore[dangerous-triggers]
   workflow_run:
-    workflows: [CI, Workflow Security]
+    workflows: [CI, Workflow Security, AppSec]
     types: [completed]
 
 # Metadata only: never check out PR code or consume its artifacts here.
@@ -17,8 +17,7 @@ concurrency:
 jobs:
   automerge:
     permissions:
-      # Required when enabling auto-merge for updates to workflow files.
-      actions: write
+      actions: read
       contents: write
       pull-requests: write
       checks: read
@@ -29,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Enable native auto-merge for the checked Dependabot commit
+      - name: Merge the current checked Dependabot commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -41,17 +40,47 @@ jobs:
             echo 'No associated pull request; nothing to merge.'
             exit 0
           fi
-          info="$(gh pr view "$pr" --repo "$REPO" --json author,isCrossRepository,headRefOid,baseRefName,isDraft,state,statusCheckRollup)"
+          info="$(gh pr view "$pr" --repo "$REPO" --json author,isCrossRepository,headRefOid,baseRefName,isDraft,state,mergeStateStatus,statusCheckRollup)"
           if ! jq -e --arg sha "$CHECKED_SHA" '
             (.author.login == "app/dependabot" or .author.login == "dependabot[bot]") and
             .isCrossRepository == false and .baseRefName == "main" and
             .state == "OPEN" and .isDraft == false and .headRefOid == $sha and
-            (["ci-gate", "workflow-security-gate"] -
+            (["ci-gate", "workflow-security-gate",
+              "security / codeql (rust)", "security / codeql (actions)"] -
               [.statusCheckRollup[] | select(.status == "COMPLETED" and .conclusion == "SUCCESS") | .name] | length == 0)
           ' <<< "$info" >/dev/null; then
-            echo 'The current Dependabot commit has not passed both required gates.'
+            echo 'The current Dependabot commit has not passed CI, workflow security, and both CodeQL analyses.'
             exit 0
           fi
-          # Native protection enforces checks and an up-to-date branch, without reviews.
-          gh pr merge "$pr" --repo "$REPO" --auto --squash \
+
+          # Old successful check runs may remain on a SHA during a failed rerun.
+          appsec="$(gh run list --repo "$REPO" --workflow appsec.yml \
+            --event pull_request --commit "$CHECKED_SHA" --limit 1 \
+            --json headSha,status,conclusion)"
+          if ! jq -e --arg sha "$CHECKED_SHA" '
+            length == 1 and .[0].headSha == $sha and
+            .[0].status == "completed" and .[0].conclusion == "success"
+          ' <<< "$appsec" >/dev/null; then
+            echo 'The latest AppSec run for this commit has not succeeded; no merge.'
+            exit 0
+          fi
+
+          # A stale branch can create workflow-file contents that GITHUB_TOKEN
+          # cannot write. Wait for Dependabot to refresh its signed commit.
+          base_sha="$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)"
+          comparison="$(gh api "repos/$REPO/compare/$base_sha...$CHECKED_SHA")"
+          if ! jq -e --arg base "$base_sha" '
+            .behind_by == 0 and .merge_base_commit.sha == $base
+          ' <<< "$comparison" >/dev/null; then
+            echo 'Dependabot must refresh this branch after main changed; no merge.'
+            exit 0
+          fi
+          if ! jq -e '.mergeStateStatus == "CLEAN"' <<< "$info" >/dev/null; then
+            echo 'Native branch protection is not ready; no merge.'
+            exit 0
+          fi
+
+          # Do not arm a future merge after this readiness check. Native protection
+          # and the expected head enforce the current state again at merge time.
+          gh pr merge "$pr" --repo "$REPO" --squash \
             --match-head-commit "$CHECKED_SHA"
