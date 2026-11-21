@@ -2,6 +2,11 @@
 
 Template repository for scheduled Rust bots running on GitHub Actions.
 
+[Agent instructions](AGENTS.md) describe deterministic bot tests, property and
+mutation testing, and risk-specific Rust tools. Advanced tools are selection
+guidance, not preinstalled CI checks. Files copied from this template do not
+update existing derived repositories automatically.
+
 `Cargo.lock` is committed because this is an application. CI and the bot runner use
 `--locked`; update the committed lockfile when dependencies change. CI also runs
 the harmless placeholder without Telegram credentials.
@@ -25,9 +30,10 @@ both gates, keep the branch up to date, and enable native auto-merge.
 
 ## Local Commands
 - `cargo fmt --all -- --check`
-- `cargo check --tests --benches`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-- `cargo nextest run --no-tests=pass`
+- `cargo check --locked --tests --benches`
+- `cargo clippy --locked --all-targets --all-features -- -D warnings`
+- `cargo nextest run --locked --no-tests=pass` (empty scaffold only; remove the
+  zero-test exception from CI and local commands when implementing bot behavior)
 - `cargo audit`
 - `cargo deny check advisories bans sources`
 - `cargo machete`
